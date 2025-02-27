@@ -274,11 +274,11 @@ class Sim {
           var v = (this.v[i * n + j] + this.v[i * n + j + 1]) * 0.5;
 
           // trace back
-          var x = i*h + h2 - dt*u;
-          var y = j*h + h2 - dt*v;
+          var x = i * h + h2 - dt * u;
+          var y = j * h + h2 - dt * v;
 
           // sample smoke from previous position
-          this.newM[i*n + j] = this.sampleGridField(x, y, S_FIELD);
+          this.newM[i * n + j] = this.sampleGridField(x, y, S_FIELD);
         }
       }
     }
@@ -288,7 +288,6 @@ class Sim {
   }
 
   simulate(dt, gravity, numIters, overRelaxation) {
-
     // add forces
     this.addForces(dt, gravity);
 
@@ -304,5 +303,4 @@ class Sim {
     // advect smoke field
     this.advectSmoke(dt);
   }
-
 }

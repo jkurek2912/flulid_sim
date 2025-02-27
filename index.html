@@ -1,95 +1,191 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>Fluid Simulator</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
-        
-        .button {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 10px 15px;
-            text-align: center;
-            font-size: 16px;
-            margin: 4px 2px;
-            cursor: pointer;
-            border-radius: 4px;
-        }
-        
-        canvas {
-            border: 1px solid #000;
-            margin-top: 10px;
-        }
-        
-        .controls {
-            margin-bottom: 10px;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 20px;
+      }
+
+      .button {
+        background-color: #4caf50;
+        border: none;
+        color: white;
+        padding: 10px 15px;
+        text-align: center;
+        font-size: 16px;
+        margin: 4px 2px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+
+      canvas {
+        border: 1px solid #000;
+        margin-top: 10px;
+      }
+
+      .controls {
+        margin-bottom: 10px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="controls">
-        <button class="button" onclick="setupWindTunnel()">Wind Tunnel</button>
-        <button class="button" onclick="setupPaintMode()">Paint Mode</button>
-        <input type="checkbox" id="showVelocity" onclick="toggleVelocityLines()">Show Velocity
+      <button class="button" onclick="setupWindTunnel()">Wind Tunnel</button>
+      <button class="button" onclick="setupPaintMode()">Paint Mode</button>
+      <input
+        type="checkbox"
+        id="showVelocity"
+        onclick="toggleVelocityLines()"
+      />Show Velocity
     </div>
-    
+
     <canvas id="simCanvas"></canvas>
-    
+
     <script src="sim.js"></script>
     <script>
-        // Canvas setup
-        const canvas = document.getElementById('simCanvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Set canvas dimensions
-        canvas.width = window.innerWidth - 40;
-        canvas.height = window.innerHeight - 100;
-        
-        // Simulation settings
-        const simHeight = 1.1;
-        const cScale = canvas.height / simHeight;
-        const simWidth = canvas.width / cScale;
-        
-        // Scene state
-        const scene = {
-            fluid: null,
-            showVelocities: false,
-            gravity: 0.0,
-            dt: 1/60,
-            numIters: 40,
-            overRelaxation: 1.9,
-            obstacleX: 0.0,
-            obstacleY: 0.0,
-            obstacleRadius: 0.1,
-            mouseDown: false
-        };
-        
-        // Functions to implement:
-        // - setupWindTunnel()
-        // - setupPaintMode()
-        // - toggleVelocityLines()
-        // - draw()
-        // - simulate()
-        // - Mouse/touch event handling
-        
-        // Initialize
-        function init() {
-            setupWindTunnel();
-            requestAnimationFrame(update);
+      // Canvas setup
+      const canvas = document.getElementById("simCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // Set canvas dimensions
+      canvas.width = window.innerWidth - 40;
+      canvas.height = window.innerHeight - 100;
+
+      // Simulation settings
+      const simHeight = 1.1;
+      const cScale = canvas.height / simHeight;
+      const simWidth = canvas.width / cScale;
+
+      // Scene state
+      const scene = {
+        fluid: null,
+        showVelocities: false,
+        gravity: 0.0,
+        dt: 1 / 60,
+        numIters: 40,
+        overRelaxation: 1.5,
+        obstacleX: 0.0,
+        obstacleY: 0.0,
+        obstacleRadius: 0.1,
+        mouseDown: false,
+      };
+
+      // Functions to implement:
+      // - setupWindTunnel()
+      // - setupPaintMode()
+      // - toggleVelocityLines()
+      // - draw()
+      // - simulate()
+      // - Mouse/touch event handling
+
+      // Initialize
+      function init() {
+        setupWindTunnel();
+        requestAnimationFrame(update);
+      }
+
+      function update() {
+        simulate();
+        draw();
+        requestAnimationFrame(update);
+      }
+
+      function setupWindTunnel() {
+        // reset params
+        scene.gravity = 0.0;
+        scene.overRelaxation = 1.5;
+        scene.numIters = 40;
+        scene.showVelocities = false;
+
+        // set dimensions
+        const res = 100;
+        const h = simHeight / res;
+        const numX = Math.floor(simWidth / h);
+        const numY = Math.floor(simHeight / h);
+
+        scene.fluid = new Sim(numX, numY, h);
+
+        const n = scene.fluid.numY;
+        const f = scene.fluid;
+
+        // set up boundary conditions for wind tunnel
+        for (let i = 0; i < f.numX; i++) {
+          for (let j = 0; j < f.numY; j++) {
+            // default to fluid
+            let s = 1.0;
+
+            // make left, top, and bottom boundaries solid
+            if (i == 0 || j == 0 || j == f.numY - 1) {
+              s = 0.0;
+            }
+
+            f.s[i * n + j] = s;
+
+            // set inlet velocity at the left edge
+            if (i == 1) {
+              f.u[i * n + j] = 2.0;
+            }
+          }
         }
-        
-        function update() {
-            simulate();
-            draw();
-            requestAnimationFrame(update);
+
+        // place obstacle on screen
+        placeObstacle(0.4, 0.5, true);
+
+        // reset any UI elements
+        document.getElementById("showVelocity").checked = scene.showVelocities;
+      }
+
+      // helper function to place obstacle
+      function placeObstacle(x, y, reset) {
+        let vx = 0.0;
+        let vy = 0.0;
+
+        if (!reset) {
+          // calculate obstalce velocity if its being moved
+          vx = (x - scene.obstacleX) / scene.dt;
+          vy = (y - scene.obstacleY) / scene.dt;
         }
-        
-        init();
+
+        // update position
+        scene.obstacleX = x;
+        scene.obstacleY = y;
+
+        const r = scene.obstacleRadius;
+        const f = scene.fluid;
+        const n = f.numY;
+
+        // apply obstacle to fluid grid
+        for (let i = 0; i < f.numX - 1; i++) {
+          for (let j = 0; j < f.numY - 1; j++) {
+            // reset cell to fluid
+            f.s[i * n + j] = 1.0;
+
+            // calculate distance to obstacle center
+            const dx = (i + 0.5) * f.h - x;
+            const dy = (j + 0.5) * f.h - y;
+
+            // if inside obstacle radius, mark solid
+            if (dx * dx + dy * dy < r * r) {
+              f.s[i * n + j] = 0.0;
+
+              // add smoke at obstacle for visualization
+              f.m[i * n + j] = 1.0;
+
+              // set velocities to match obstacle if its moving
+              f.u[i * n + j] = vx;
+              f.u[(i + 1) * n + j] = vx;
+              f.v[i * n + j] = vy;
+              f.v[i * n + j + 1] = vy;
+
+            }
+          }
+        }
+      }
+
+      init();
     </script>
-</body>
+  </body>
 </html>
