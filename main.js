@@ -253,4 +253,37 @@ class Sim {
       0.25;
     return v;
   }
+
+  advectSmoke(dt) {
+    // save current smoke field
+    this.newM.set(this.m);
+
+    var n = this.numY;
+    var h = this.h;
+    var h2 = 0.5 * h;
+
+    // define field constant for sampleGridField
+    var S_FIELD = 2;
+
+    // advect smoke field
+    for (var i = 1; i < this.numX; i++) {
+      for (var j = 1; j < this.numY; j++) {
+        if (this.s[i * n + j] != 0.0) {
+          // get velocity at cell center
+          var u = (this.u[i * n + j] + this.u[(i + 1) * n + j]) * 0.5;
+          var v = (this.v[i * n + j] + this.v[i * n + j + 1]) * 0.5;
+
+          // trace back
+          var x = i*h + h2 - dt*u;
+          var y = j*h + h2 - dt*v;
+
+          // sample smoke from previous position
+          this.newM[i*n + j] = this.sampleGridField(x, y, S_FIELD);
+        }
+      }
+    }
+
+    // update smoke field
+    this.m.set(this.newM);
+  }
 }
