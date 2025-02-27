@@ -17,7 +17,6 @@ class Sim {
         this.newV = new Float32Array(this.numCells);
 
         // array to keep track of state (solid = 0, fluid = 1)
-        this.s = new Float32Array(this.numCells);
 
         // smoke/dye concentration
         this.m = new Float32Array(this.numCells);
