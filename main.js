@@ -98,20 +98,20 @@ class Sim {
         for (var i = 0; i < this.numX; i++) {
             
             // bottom boundary
-            this.u[i*n] = this.u[i+n + 1];
+            this.u[i*n] = this.u[i*n + 1];
             
             // top boundary
             this.u[i*n + this.numY - 1] = this.u[i*n + this.numY - 2];
         }
 
         // copy vertical velocities to boundary cells
-        for (var i = 0; i < this.numY; i++) {
+        for (var j = 0; j < this.numY; j++) {
             
             // left boundary
-            this.v[i] = this.v[n + i];
+            this.v[j] = this.v[n + j];
             
             // right boundary
-            this.v[(this.numX - 1)*n + i] = this.v[(this.numX - 2)*n + i];
+            this.v[(this.numX - 1)*n + j] = this.v[(this.numX - 2)*n + j];
         }
     }
 
