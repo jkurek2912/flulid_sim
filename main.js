@@ -26,4 +26,24 @@ class Sim {
         this.s.fill(1.0);
         this.m.fill(1.0);
     }
+
+    addForces(dt, gravity) {
+        var n = this.numY;
+
+        // loop through all grid cells except for boundary
+        for (var i = 1; i < this.numX; i++) {
+            for (var j = 1; j < this.numY; j++) {
+            
+                // apply forces to fluid cells that have fluid below them
+                // use i*n+j converts 2d coordinates to 1d state array index (row major ordering)
+                if (this.s[i*n+j] != 0.0 && this.s[i*n+j-1] != 0.0) {
+
+                    // add gravity to vertical velocity
+                    this.v[i*n+j] += gravity *dt;
+                }
+            }
+        }
+    }
+
+
 }
