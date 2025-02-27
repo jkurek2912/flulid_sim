@@ -162,4 +162,89 @@ class Sim {
 
     return val;
   }
+
+  advectVelocity(dt) {
+    // save current velocity field
+    this.newU.set(this.u);
+    this.newV.set(this.u);
+
+    var n = this.numY;
+    var h = this.h;
+    var h2 = 0.5 * h;
+
+    // field constants for sampleGridField
+    var U_FIELD = 0;
+    var V_FIELD = 1;
+
+    // adjust velocity fields
+    for (var i = 1; i < this.numX; i++) {
+      for (var j = 1; j < this.numY; j++) {
+        // advect horizontal velocity
+        if (
+          this.s[i * n + j] != 0.0 &&
+          this.s[(i - 1) * n + j] != 0.0 &&
+          j < this.numY - 1
+        ) {
+          var x = i * h;
+          var y = j * h + h2;
+
+          // get velocity field at this position
+          var u = this.u[i * n + j];
+          var v = this.avgV(i, j);
+
+          x = x - dt * u;
+          y = y - dt * v;
+
+          // sample velocity field from previous position
+          u = this.sampleGridField(x, y, U_FIELD);
+          this.newU[i * n + j] = u;
+        }
+
+        // advect vertical velocity
+        if (
+          this.s[i * n + j] != 0.0 &&
+          this.s[i * n + j - 1] != 0.0 &&
+          i < this.numX - 1
+        ) {
+          var x = i * h + h2;
+          var y = j * h;
+
+          // get velocity field at this position
+          var u = this.avgU(i, j);
+          var v = this.v[i * n + j];
+
+          x = x - dt * u;
+          y = y - dt * v;
+
+          var v = this.sampleGridField(x, y, V_FIELD);
+          this.newV[i * n + j] = v;
+        }
+      }
+    }
+    // update velocity fields
+    this.u.set(this.newU);
+    this.v.set(this.newV);
+  }
+
+  avgU(i, j) {
+    var n = this.numY;
+    var u =
+      (this.u[i * n + j - 1] +
+        this.u[i * n + j] +
+        this.u[(i + 1) * n + j - 1] +
+        this.u[(i + 1) * n + j]) *
+      0.25;
+    return u;
+  }
+
+  avgV(i, j) {
+    var n = this.numY;
+    var v =
+      (this.v[(i - 1) * n + j] +
+        this.v[i * n + j] +
+        this.v[(i - 1) * n + j + 1] +
+        this.v[i * n + j + 1]) *
+      0.25;
+    return v;
+  }
 }
