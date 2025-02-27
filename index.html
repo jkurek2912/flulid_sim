@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fluid Simulator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 15px;
+            text-align: center;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        canvas {
+            border: 1px solid #000;
+            margin-top: 10px;
+        }
+        
+        .controls {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <button class="button" onclick="setupWindTunnel()">Wind Tunnel</button>
+        <button class="button" onclick="setupPaintMode()">Paint Mode</button>
+        <input type="checkbox" id="showVelocity" onclick="toggleVelocityLines()">Show Velocity
+    </div>
+    
+    <canvas id="simCanvas"></canvas>
+    
+    <script src="sim.js"></script>
+    <script>
+        // Canvas setup
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set canvas dimensions
+        canvas.width = window.innerWidth - 40;
+        canvas.height = window.innerHeight - 100;
+        
+        // Simulation settings
+        const simHeight = 1.1;
+        const cScale = canvas.height / simHeight;
+        const simWidth = canvas.width / cScale;
+        
+        // Scene state
+        const scene = {
+            fluid: null,
+            showVelocities: false,
+            gravity: 0.0,
+            dt: 1/60,
+            numIters: 40,
+            overRelaxation: 1.9,
+            obstacleX: 0.0,
+            obstacleY: 0.0,
+            obstacleRadius: 0.1,
+            mouseDown: false
+        };
+        
+        // Functions to implement:
+        // - setupWindTunnel()
+        // - setupPaintMode()
+        // - toggleVelocityLines()
+        // - draw()
+        // - simulate()
+        // - Mouse/touch event handling
+        
+        // Initialize
+        function init() {
+            setupWindTunnel();
+            requestAnimationFrame(update);
+        }
+        
+        function update() {
+            simulate();
+            draw();
+            requestAnimationFrame(update);
+        }
+        
+        init();
+    </script>
+</body>
+</html>
