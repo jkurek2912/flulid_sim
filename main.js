@@ -166,7 +166,7 @@ class Sim {
   advectVelocity(dt) {
     // save current velocity field
     this.newU.set(this.u);
-    this.newV.set(this.u);
+    this.newV.set(this.v);
 
     var n = this.numY;
     var h = this.h;
@@ -192,8 +192,11 @@ class Sim {
           var u = this.u[i * n + j];
           var v = this.avgV(i, j);
 
+          // backtrace and clamp
           x = x - dt * u;
           y = y - dt * v;
+          x = Math.max(Math.min(x, this.numX * h), h);
+          y = Math.max(Math.min(y, this.numY * h), h);
 
           // sample velocity field from previous position
           u = this.sampleGridField(x, y, U_FIELD);
@@ -213,10 +216,13 @@ class Sim {
           var u = this.avgU(i, j);
           var v = this.v[i * n + j];
 
+          // backtrace and clamp
           x = x - dt * u;
           y = y - dt * v;
+          x = Math.max(Math.min(x, this.numX * h), h);
+          y = Math.max(Math.min(y, this.numY * h), h);
 
-          var v = this.sampleGridField(x, y, V_FIELD);
+          v = this.sampleGridField(x, y, V_FIELD);
           this.newV[i * n + j] = v;
         }
       }
