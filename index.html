@@ -74,11 +74,9 @@
       };
 
       // Functions to implement:
-      // - setupWindTunnel()
       // - setupPaintMode()
       // - toggleVelocityLines()
       // - draw()
-      // - simulate()
       // - Mouse/touch event handling
 
       // Initialize
@@ -144,7 +142,7 @@
         let vy = 0.0;
 
         if (!reset) {
-          // calculate obstalce velocity if its being moved
+          // calculate obstacle velocity if its being moved
           vx = (x - scene.obstacleX) / scene.dt;
           vy = (y - scene.obstacleY) / scene.dt;
         }
@@ -158,8 +156,8 @@
         const n = f.numY;
 
         // apply obstacle to fluid grid
-        for (let i = 0; i < f.numX - 1; i++) {
-          for (let j = 0; j < f.numY - 1; j++) {
+        for (let i = 1; i < f.numX - 1; i++) {
+          for (let j = 1; j < f.numY - 1; j++) {
             // reset cell to fluid
             f.s[i * n + j] = 1.0;
 
@@ -168,7 +166,7 @@
             const dy = (j + 0.5) * f.h - y;
 
             // if inside obstacle radius, mark solid
-            if (dx * dx + dy * dy < r * r) {
+            if (dx * dx + dy * dy <= r * r) {
               f.s[i * n + j] = 0.0;
 
               // add smoke at obstacle for visualization
@@ -179,9 +177,76 @@
               f.u[(i + 1) * n + j] = vx;
               f.v[i * n + j] = vy;
               f.v[i * n + j + 1] = vy;
-
             }
           }
+        }
+      }
+
+      function draw() {
+        // clear canvas
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+        // if no fluid sim, return
+        if (!scene.fluid) return;
+
+        const f = scene.fluid;
+        const n = f.numY;
+        const h = f.h;
+
+        // draw smoke and density fields
+        for (let i = 0; i < f.numX; i++) {
+          for (let j = 0; j < f.numY; j++) {
+            // skip solid cells
+            if (f.s[(i * n, j)] == 0.0) {
+              continue;
+            }
+
+            // calculate cell center
+            const x = i * h;
+            const y = j * h;
+
+            // get smoke density
+            const density = f.m[i * n + j];
+
+            ctx.globalAlpha = density;
+            ctx.fillStyle = "black";
+
+            // draw cell
+            ctx.fillRect(
+              x * cScale,
+              (simHeight - y - h) * cScale,
+              h * cScale,
+              h * sCale
+            );
+          }
+        }
+
+        // draw obstacle
+        if (scene.obstacleX !== 0 || scene.obstacleY !== 0) {
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = "green";
+          ctx.beginPath();
+          ctx.arc(
+            scene.obstacleX * cScale,
+            (simHeight - scene.obstacleY) * cScale,
+            scene.obstacleRadius * cScale,
+            0,
+            Math.PI * 2
+          );
+        }
+      }
+
+      function simulate() {
+        // Only simulate if not paused
+        if (!scene.paused) {
+          scene.fluid.simulate(
+            scene.dt, // time step
+            scene.gravity, // gravity
+            scene.numIters // number of pressure solve iterations
+          );
+
+          // Increment frame number
+          scene.frameNr++;
         }
       }
 

@@ -23,6 +23,9 @@ class Sim {
     this.m = new Float32Array(this.numCells);
     this.newM = new Float32Array(this.numCells);
 
+    // array for pressure
+    this.p = new Float32Array(this.numCells);
+
     this.s.fill(1.0);
     this.m.fill(0.0);
   }
@@ -45,6 +48,9 @@ class Sim {
 
   correctDivergence(numIterations, dt, overRelaxation) {
     var n = this.numY;
+
+    // Zero out pressure array before solving
+    this.p.fill(0.0);
 
     // iterate multiple times for better approximation
     for (var iter = 0; iter < numIterations; iter++) {
@@ -78,6 +84,9 @@ class Sim {
 
           // calculate pressure
           var p = (-div / s) * overRelaxation;
+
+          // Update pressure
+          this.p[i * n + j] += p;
 
           // apply presure adjustment to cells
           this.u[(i + 1) * n + j] += nx1 * p; // Add to right face
@@ -137,6 +146,11 @@ class Sim {
     } else if (field == 2) {
       // smoke/density
       f = this.m;
+      dx = h2;
+      dy = h2;
+    } else if (field == 3) {
+      // pressure
+      f = this.p;
       dx = h2;
       dy = h2;
     }
@@ -288,6 +302,9 @@ class Sim {
   }
 
   simulate(dt, gravity, numIters, overRelaxation) {
+    // zero out pressure
+    this.p.fill(0.0);
+
     // add forces
     this.addForces(dt, gravity);
 
