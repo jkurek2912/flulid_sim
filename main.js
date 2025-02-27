@@ -286,4 +286,23 @@ class Sim {
     // update smoke field
     this.m.set(this.newM);
   }
+
+  simulate(dt, gravity, numIters, overRelaxation) {
+
+    // add forces
+    this.addForces(dt, gravity);
+
+    // apply incompressibility constraint
+    this.correctDivergence(numIters, dt, overRelaxation);
+
+    // handle boundary conditions
+    this.fillBoundaryVelocities();
+
+    // advect velocity field
+    this.advectVelocity(dt);
+
+    // advect smoke field
+    this.advectSmoke(dt);
+  }
+
 }
