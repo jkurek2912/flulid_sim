@@ -76,7 +76,6 @@
       // Functions to implement:
       // - setupPaintMode()
       // - toggleVelocityLines()
-      // - draw()
       // - Mouse/touch event handling
 
       // Initialize
@@ -183,59 +182,428 @@
       }
 
       function draw() {
-        // clear canvas
-        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+        // Clear the canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // if no fluid sim, return
+        // If no fluid simulation, return
         if (!scene.fluid) return;
 
         const f = scene.fluid;
         const n = f.numY;
         const h = f.h;
 
-        // draw smoke and density fields
+        // Find min and max pressure for color scaling
+        let minP = f.p[0];
+        let maxP = f.p[0];
+        for (let i = 0; i < f.numCells; i++) {
+          minP = Math.min(minP, f.p[i]);
+          maxP = Math.max(maxP, f.p[i]);
+        }
+
+        // Create image data for efficient pixel manipulation
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Rendering cell-by-cell
         for (let i = 0; i < f.numX; i++) {
           for (let j = 0; j < f.numY; j++) {
-            // skip solid cells
-            if (f.s[(i * n, j)] == 0.0) {
-              continue;
+            let color = [255, 255, 255, 255];
+
+            // Color selection based on scene settings
+            if (scene.showPressure) {
+              const p = f.p[i * n + j];
+              const s = f.m[i * n + j];
+              color = getSciColor(p, minP, maxP);
+
+              // Blend with smoke if both are shown
+              if (scene.showSmoke) {
+                color[0] = Math.max(0, color[0] - 255 * s);
+                color[1] = Math.max(0, color[1] - 255 * s);
+                color[2] = Math.max(0, color[2] - 255 * s);
+              }
+            } else if (scene.showSmoke) {
+              const s = f.m[i * n + j];
+
+              // Different coloring for paint mode
+              if (scene.sceneNr === 2) {
+                color = getSciColor(s, 0.0, 1.0);
+              } else {
+                color[0] = 255 * s;
+                color[1] = 255 * s;
+                color[2] = 255 * s;
+              }
+            } else if (f.s[i * n + j] == 0.0) {
+              // Solid cells
+              color[0] = 0;
+              color[1] = 0;
+              color[2] = 0;
             }
 
-            // calculate cell center
-            const x = i * h;
-            const y = j * h;
+            // Cell rendering
+            const x = Math.floor(cX(i * h));
+            const y = Math.floor(cY((j + 1) * h));
+            const cellScale = 1.1;
+            const cx = Math.floor(cScale * cellScale * h) + 1;
+            const cy = Math.floor(cScale * cellScale * h) + 1;
 
-            // get smoke density
-            const density = f.m[i * n + j];
-
-            ctx.globalAlpha = density;
-            ctx.fillStyle = "black";
-
-            // draw cell
-            ctx.fillRect(
-              x * cScale,
-              (simHeight - y - h) * cScale,
-              h * cScale,
-              h * sCale
-            );
+            // Fill pixel data
+            for (let yi = y; yi < y + cy; yi++) {
+              let p = 4 * (yi * canvas.width + x);
+              for (let xi = 0; xi < cx; xi++) {
+                data[p++] = color[0];
+                data[p++] = color[1];
+                data[p++] = color[2];
+                data[p++] = 255;
+              }
+            }
           }
         }
 
-        // draw obstacle
-        if (scene.obstacleX !== 0 || scene.obstacleY !== 0) {
-          ctx.globalAlpha = 1;
-          ctx.fillStyle = "green";
+        // Put processed image data back to canvas
+        ctx.putImageData(imageData, 0, 0);
+
+        // Velocity lines rendering
+        if (scene.showVelocities) {
+          ctx.strokeStyle = "#000000";
+          const scale = 0.02;
+
+          for (let i = 0; i < f.numX; i++) {
+            for (let j = 0; j < f.numY; j++) {
+              const u = f.u[i * n + j];
+              const v = f.v[i * n + j];
+
+              // Horizontal velocity line
+              ctx.beginPath();
+              const x0 = cX(i * h);
+              const x1 = cX(i * h + u * scale);
+              const y = cY((j + 0.5) * h);
+              ctx.moveTo(x0, y);
+              ctx.lineTo(x1, y);
+              ctx.stroke();
+
+              // Vertical velocity line
+              ctx.beginPath();
+              const x = cX((i + 0.5) * h);
+              const y0 = cY(j * h);
+              const y1 = cY(j * h + v * scale);
+              ctx.moveTo(x, y0);
+              ctx.lineTo(x, y1);
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Streamlines rendering
+        if (scene.showStreamlines) {
+          const segLen = f.h * 0.2;
+          const numSegs = 15;
+
+          ctx.strokeStyle = "#000000";
+
+          for (let i = 1; i < f.numX - 1; i += 5) {
+            for (let j = 1; j < f.numY - 1; j += 5) {
+              let x = (i + 0.5) * f.h;
+              let y = (j + 0.5) * f.h;
+
+              ctx.beginPath();
+              ctx.moveTo(cX(x), cY(y));
+
+              for (let n = 0; n < numSegs; n++) {
+                const u = f.sampleGridField(x, y, U_FIELD);
+                const v = f.sampleGridField(x, y, V_FIELD);
+
+                x += u * 0.01;
+                y += v * 0.01;
+
+                if (x > f.numX * f.h) break;
+
+                ctx.lineTo(cX(x), cY(y));
+              }
+              ctx.stroke();
+            }
+          }
+        }
+
+        // Obstacle rendering
+        if (scene.showObstacle) {
+          const r = scene.obstacleRadius + f.h;
+          ctx.fillStyle = scene.showPressure ? "#000000" : "#DDDDDD";
           ctx.beginPath();
           ctx.arc(
-            scene.obstacleX * cScale,
-            (simHeight - scene.obstacleY) * cScale,
-            scene.obstacleRadius * cScale,
-            0,
-            Math.PI * 2
+            cX(scene.obstacleX),
+            cY(scene.obstacleY),
+            cScale * r,
+            0.0,
+            2.0 * Math.PI
           );
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.lineWidth = 3.0;
+          ctx.strokeStyle = "#000000";
+          ctx.beginPath();
+          ctx.arc(
+            cX(scene.obstacleX),
+            cY(scene.obstacleY),
+            cScale * r,
+            0.0,
+            2.0 * Math.PI
+          );
+          ctx.closePath();
+          ctx.stroke();
+          ctx.lineWidth = 1.0;
+        }
+
+        // Pressure text rendering
+        if (scene.showPressure) {
+          const pressureText = `pressure: ${minP.toFixed(0)} - ${maxP.toFixed(
+            0
+          )} N/m`;
+          ctx.fillStyle = "#000000";
+          ctx.font = "16px Arial";
+          ctx.fillText(pressureText, 10, 35);
         }
       }
 
+      // Helper function for scientific color mapping
+      function getSciColor(val, minVal, maxVal) {
+        val = Math.min(Math.max(val, minVal), maxVal - 0.0001);
+        const d = maxVal - minVal;
+        val = d === 0.0 ? 0.5 : (val - minVal) / d;
+        const m = 0.25;
+        const num = Math.floor(val / m);
+        const s = (val - num * m) / m;
+        let r, g, b;
+
+        switch (num) {
+          case 0:
+            r = 0.0;
+            g = s;
+            b = 1.0;
+            break;
+          case 1:
+            r = 0.0;
+            g = 1.0;
+            b = 1.0 - s;
+            break;
+          case 2:
+            r = s;
+            g = 1.0;
+            b = 0.0;
+            break;
+          case 3:
+            r = 1.0;
+            g = 1.0 - s;
+            b = 0.0;
+            break;
+        }
+
+        return [255 * r, 255 * g, 255 * b, 255];
+      }
+
+      // Conversion functions (assuming these are defined globally)
+      function cX(x) {
+        return x * cScale;
+      }
+
+      function cY(y) {
+        return canvas.height - y * cScale;
+      }
+      function setupScene(sceneNr = 0) {
+        // Set scene-specific parameters
+        scene.sceneNr = sceneNr;
+        scene.obstacleRadius = 0.15;
+        scene.overRelaxation = 1.9;
+
+        // Default time step and iterations
+        scene.dt = 1.0 / 60.0;
+        scene.numIters = 40;
+
+        // Set resolution based on scene
+        let res = 100;
+        if (sceneNr === 0) {
+          // Tank scene
+          res = 50;
+        } else if (sceneNr === 3) {
+          // High-resolution tunnel scene
+          res = 200;
+        }
+
+        // Calculate domain dimensions
+        const domainHeight = 1.0;
+        const domainWidth = (domainHeight / simHeight) * simWidth;
+        const h = domainHeight / res;
+
+        // Calculate grid dimensions
+        const numX = Math.floor(domainWidth / h);
+        const numY = Math.floor(domainHeight / h);
+
+        // Create fluid simulation
+        scene.fluid = new Sim(numX, numY, h);
+        const f = scene.fluid;
+        const n = f.numY;
+
+        // Scene-specific setup
+        switch (sceneNr) {
+          case 0: // Tank scene
+            // Set boundary conditions
+            for (let i = 0; i < f.numX; i++) {
+              for (let j = 0; j < f.numY; j++) {
+                // Default to fluid
+                let s = 1.0;
+
+                // Make left, right, and bottom boundaries solid
+                if (i === 0 || i === f.numX - 1 || j === 0) {
+                  s = 0.0;
+                }
+
+                f.s[i * n + j] = s;
+              }
+            }
+
+            scene.gravity = -9.81;
+            scene.showPressure = true;
+            scene.showSmoke = false;
+            scene.showStreamlines = false;
+            scene.showVelocities = false;
+            break;
+
+          case 1: // Wind tunnel scene
+          case 3: // High-res tunnel scene
+            const inVel = 2.0;
+
+            // Set boundary conditions
+            for (let i = 0; i < f.numX; i++) {
+              for (let j = 0; j < f.numY; j++) {
+                // Default to fluid
+                let s = 1.0;
+
+                // Make left, top, and bottom boundaries solid
+                if (i === 0 || j === 0 || j === f.numY - 1) {
+                  s = 0.0;
+                }
+
+                f.s[i * n + j] = s;
+
+                // Set inlet velocity at the left edge
+                if (i === 1) {
+                  f.u[i * n + j] = inVel;
+                }
+              }
+            }
+
+            // Define smoke/dye region
+            const pipeH = 0.1 * f.numY;
+            const minJ = Math.floor(0.5 * f.numY - 0.5 * pipeH);
+            const maxJ = Math.floor(0.5 * f.numY + 0.5 * pipeH);
+
+            // Clear smoke in the central region
+            for (let j = minJ; j < maxJ; j++) {
+              f.m[j] = 0.0;
+            }
+
+            // Place obstacle
+            setObstacle(0.4, 0.5, true);
+
+            scene.gravity = 0.0;
+            scene.showPressure = false;
+            scene.showSmoke = true;
+            scene.showStreamlines = false;
+            scene.showVelocities = false;
+
+            // Special settings for high-res scene
+            if (sceneNr === 3) {
+              scene.dt = 1.0 / 120.0;
+              scene.numIters = 100;
+              scene.showPressure = true;
+            }
+            break;
+
+          case 2: // Paint mode
+            scene.gravity = 0.0;
+            scene.overRelaxation = 1.0;
+            scene.showPressure = false;
+            scene.showSmoke = true;
+            scene.showStreamlines = false;
+            scene.showVelocities = false;
+            scene.obstacleRadius = 0.1;
+            break;
+        }
+
+        // Update UI checkboxes to reflect scene settings
+        if (document.getElementById("streamButton")) {
+          document.getElementById("streamButton").checked =
+            scene.showStreamlines;
+        }
+        if (document.getElementById("velocityButton")) {
+          document.getElementById("velocityButton").checked =
+            scene.showVelocities;
+        }
+        if (document.getElementById("pressureButton")) {
+          document.getElementById("pressureButton").checked =
+            scene.showPressure;
+        }
+        if (document.getElementById("smokeButton")) {
+          document.getElementById("smokeButton").checked = scene.showSmoke;
+        }
+        if (document.getElementById("overrelaxButton")) {
+          document.getElementById("overrelaxButton").checked =
+            scene.overRelaxation > 1.0;
+        }
+      }
+
+      // Helper function to place obstacle
+      function setObstacle(x, y, reset) {
+        let vx = 0.0;
+        let vy = 0.0;
+
+        if (!reset) {
+          // Calculate obstacle velocity if it's being moved
+          vx = (x - scene.obstacleX) / scene.dt;
+          vy = (y - scene.obstacleY) / scene.dt;
+        }
+
+        // Update obstacle position
+        scene.obstacleX = x;
+        scene.obstacleY = y;
+
+        const r = scene.obstacleRadius;
+        const f = scene.fluid;
+        const n = f.numY;
+
+        // Apply obstacle to fluid grid
+        for (let i = 0; i < f.numX - 1; i++) {
+          for (let j = 0; j < f.numY - 1; j++) {
+            // Reset cell to fluid
+            f.s[i * n + j] = 1.0;
+
+            // Calculate distance to obstacle center
+            const dx = (i + 0.5) * f.h - x;
+            const dy = (j + 0.5) * f.h - y;
+
+            // If inside obstacle radius, mark solid
+            if (dx * dx + dy * dy <= r * r) {
+              f.s[i * n + j] = 0.0;
+
+              // Add smoke at obstacle for visualization
+              if (scene.sceneNr === 2) {
+                f.m[i * n + j] = 0.5 + 0.5 * Math.sin(0.1 * scene.frameNr);
+              } else {
+                f.m[i * n + j] = 1.0;
+              }
+
+              // Set velocities to match obstacle if it's moving
+              f.u[i * n + j] = vx;
+              f.u[(i + 1) * n + j] = vx;
+              f.v[i * n + j] = vy;
+              f.v[i * n + j + 1] = vy;
+            }
+          }
+        }
+
+        // Show obstacle
+        scene.showObstacle = true;
+      }
       function simulate() {
         // Only simulate if not paused
         if (!scene.paused) {
