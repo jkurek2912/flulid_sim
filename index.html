@@ -413,7 +413,6 @@
         // Set scene-specific parameters
         scene.sceneNr = sceneNr;
         scene.obstacleRadius = 0.15;
-        scene.overRelaxation = 1.9;
 
         // Default time step and iterations
         scene.dt = 1.0 / 60.0;
@@ -421,13 +420,6 @@
 
         // Set resolution based on scene
         let res = 100;
-        if (sceneNr === 0) {
-          // Tank scene
-          res = 50;
-        } else if (sceneNr === 3) {
-          // High-resolution tunnel scene
-          res = 200;
-        }
 
         // Calculate domain dimensions
         const domainHeight = 1.0;
@@ -445,32 +437,9 @@
 
         // Scene-specific setup
         switch (sceneNr) {
-          case 0: // Tank scene
-            // Set boundary conditions
-            for (let i = 0; i < f.numX; i++) {
-              for (let j = 0; j < f.numY; j++) {
-                // Default to fluid
-                let s = 1.0;
-
-                // Make left, right, and bottom boundaries solid
-                if (i === 0 || i === f.numX - 1 || j === 0) {
-                  s = 0.0;
-                }
-
-                f.s[i * n + j] = s;
-              }
-            }
-
-            scene.gravity = -9.81;
-            scene.showPressure = true;
-            scene.showSmoke = false;
-            scene.showStreamlines = false;
-            scene.showVelocities = false;
-            break;
-
-          case 1: // Wind tunnel scene
-          case 3: // High-res tunnel scene
-            const inVel = 2.0;
+          case 0: // Wind tunnel scene
+            scene.overRelaxation = 1.9;
+            scene.gravity = 0.0;
 
             // Set boundary conditions
             for (let i = 0; i < f.numX; i++) {
@@ -487,46 +456,32 @@
 
                 // Set inlet velocity at the left edge
                 if (i === 1) {
-                  f.u[i * n + j] = inVel;
+                  f.u[i * n + j] = 2.0;
                 }
               }
-            }
-
-            // Define smoke/dye region
-            const pipeH = 0.1 * f.numY;
-            const minJ = Math.floor(0.5 * f.numY - 0.5 * pipeH);
-            const maxJ = Math.floor(0.5 * f.numY + 0.5 * pipeH);
-
-            // Clear smoke in the central region
-            for (let j = minJ; j < maxJ; j++) {
-              f.m[j] = 0.0;
             }
 
             // Place obstacle
             setObstacle(0.4, 0.5, true);
 
-            scene.gravity = 0.0;
             scene.showPressure = false;
             scene.showSmoke = true;
             scene.showStreamlines = false;
             scene.showVelocities = false;
-
-            // Special settings for high-res scene
-            if (sceneNr === 3) {
-              scene.dt = 1.0 / 120.0;
-              scene.numIters = 100;
-              scene.showPressure = true;
-            }
             break;
 
-          case 2: // Paint mode
-            scene.gravity = 0.0;
+          case 1: // Paint mode
             scene.overRelaxation = 1.0;
+            scene.gravity = 0.0;
+            scene.obstacleRadius = 0.1;
+
+            // Set entire grid to fluid
+            f.s.fill(1.0);
+
             scene.showPressure = false;
             scene.showSmoke = true;
             scene.showStreamlines = false;
             scene.showVelocities = false;
-            scene.obstacleRadius = 0.1;
             break;
         }
 
@@ -586,7 +541,7 @@
               f.s[i * n + j] = 0.0;
 
               // Add smoke at obstacle for visualization
-              if (scene.sceneNr === 2) {
+              if (scene.sceneNr === 1) {
                 f.m[i * n + j] = 0.5 + 0.5 * Math.sin(0.1 * scene.frameNr);
               } else {
                 f.m[i * n + j] = 1.0;
